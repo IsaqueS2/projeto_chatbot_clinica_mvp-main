@@ -1,6 +1,8 @@
 # ISAQUE DE OLIVEIRA DOS SANTOS
 from flask import Flask, request, jsonify
 from agent import process_message  # Importa sua lógica do bot
+from agent import handle_message as process_message
+
 
 app = Flask(__name__)
 
