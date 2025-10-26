@@ -94,21 +94,33 @@ def process_web_message(user_message: str, chat_history: List[Dict[str, Any]]) -
 
     full_system_prompt = FULL_SYSTEM_PROMPT_TEMPLATE
     
-    # 1. Monta o conteúdo da conversa (Histórico + Mensagem Atual)
-    chat_history_with_current_message = chat_history + [{
+    # 1. CRÍTICO: Monta o conteúdo da conversa, injetando o System Prompt como o primeiro item.
+    # Isso contorna o erro 'unexpected keyword argument system_instruction' em versões antigas.
+    
+    # Primeiro item: O System Prompt
+    contents_for_api = [{
+        "role": "user",
+        "parts": [{"text": full_system_prompt}]
+    }]
+    
+    # Adiciona o histórico de conversas anterior
+    contents_for_api.extend(chat_history)
+    
+    # Adiciona a mensagem atual do usuário
+    contents_for_api.append({
         "role": "user",
         "parts": [{"text": user_message}]
-    }]
+    })
 
     print(f"--- Processando Nova Mensagem Web: {user_message} (Histórico recebido: {len(chat_history)} mensagens) ---")
 
     try:
         # --- PRIMEIRA CHAMADA À IA (Decisão: Chamada de Ferramenta, Pedido de Info ou Resposta Simples) ---
         ai_response = model.generate_content(
-            contents=chat_history_with_current_message,
-            system_instruction=full_system_prompt,  # CORRIGIDO: Argumento direto
-            tools=list(AVAILABLE_TOOLS.values()),   # CORRIGIDO: Argumento direto
-            config=generation_config                # CORRIGIDO: Apenas para response_mime_type (JSON)
+            contents=contents_for_api,                  # Usa a lista com o System Prompt injetado
+            # system_instruction=full_system_prompt,    # REMOVIDO PARA COMPATIBILIDADE COM VERSÕES ANTIGAS
+            tools=list(AVAILABLE_TOOLS.values()),   
+            config=generation_config                
         )
 
         ai_json_response_str = ai_response.text.strip()
@@ -143,21 +155,22 @@ def process_web_message(user_message: str, chat_history: List[Dict[str, Any]]) -
                 print(f"--- Resultado da Ferramenta: {tool_result} ---")
 
                 # 4. Monta o RAG (Round de Resposta) para a Segunda Chamada
+                # Usamos contents_for_api (que tem o histórico e o system prompt)
                 tool_response_content = [
                     {"role": "user", "parts": [{"text": "O usuário enviou uma nova mensagem."}]},
                     {"role": "model", "parts": [{"text": ai_json_response_str}]}, # Resultado da 1a IA
                     {"role": "tool", "parts": [{"functionResponse": {"name": tool_name, "response": tool_result}}]}
                 ]
                 
-                # Conteúdo completo para a 2a chamada: Histórico + Chamada de Ferramenta + Resultado da Ferramenta
-                final_rag_content = chat_history_with_current_message + tool_response_content
+                # Conteúdo completo para a 2a chamada: contents_for_api + Chamada de Ferramenta + Resultado da Ferramenta
+                final_rag_content = contents_for_api + tool_response_content
 
                 # --- SEGUNDA CHAMADA À IA (RAG: Gerar a Resposta Final Amigável) ---
                 final_ai_response = model.generate_content(
                     contents=final_rag_content,
-                    system_instruction=full_system_prompt,  # CORRIGIDO: Argumento direto
-                    tools=list(AVAILABLE_TOOLS.values()),   # CORRIGIDO: Argumento direto
-                    config=generation_config                # CORRIGIDO: Apenas para response_mime_type (JSON)
+                    # system_instruction=full_system_prompt,  # REMOVIDO PARA COMPATIBILIDADE COM VERSÕES ANTIGAS
+                    tools=list(AVAILABLE_TOOLS.values()),   
+                    config=generation_config                
                 )
 
                 final_ai_json_str = final_ai_response.text.strip()
@@ -182,7 +195,8 @@ def process_web_message(user_message: str, chat_history: List[Dict[str, Any]]) -
 
     except json.JSONDecodeError:
         print("ERRO FATAL: Gemini retornou um JSON inválido.")
-        print(ai_json_response_str) 
+        # Printa a string para debug
+        # print(ai_json_response_str) 
         return "Desculpe, a resposta da IA veio em um formato inválido."
 
     except Exception as e:
