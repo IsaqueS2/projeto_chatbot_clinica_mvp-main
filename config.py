@@ -2,7 +2,6 @@ import os
 import google.generativeai as genai
 from dotenv import load_dotenv
 
-# Carrega as variáveis de ambiente do .env
 load_dotenv()
 
 # --- Carrega e Limpa os Tokens ---
