@@ -1,5 +1,8 @@
+# api.py
 # ISAQUE DE OLIVEIRA DOS SANTOS
 from flask import Flask, request, jsonify
+from flask_cors import CORS  # <-- NOVO: Importar CORS
+
 # ----------------------------------------------------------------------------------------
 # ALTERAÇÃO CRÍTICA: Corrigido o erro de importação e alterado para a nova função web
 # ----------------------------------------------------------------------------------------
@@ -7,6 +10,9 @@ from agent import process_web_message
 # (A função handle_message original foi renomeada no agent.py para process_web_message)
 
 app = Flask(__name__)
+CORS(app) # <-- NOVO: Ativa o CORS para todas as rotas
+# Você também pode fazer CORS(app, resources={r"/chat": {"origins": "*"}}) para ser mais específico
+# ... (o restante do arquivo api.py permanece o mesmo)
 
 @app.route('/')
 def home():
